@@ -44,7 +44,7 @@ npm test
 npm run build
 ```
 
-El build crea `dist/`, con Three.js y OrbitControls incluidos. Publica esa carpeta en cualquier alojamiento estático con HTTP(S), también bajo un subdirectorio con URL terminada en `/`. Puedes comprobar el resultado con `npm run preview` (puerto 3036; detén antes el servidor de desarrollo o elige otro `PORT`). No necesita backend, claves ni servicios externos. Las fuentes de Google son opcionales y tienen alternativas del sistema. La publicación se realiza en [Cloudflare Pages](https://fabrica-de-dependencias.pages.dev/), conectado a `jonahaley/FabricaDeDependencias`: cada push a `main` ejecuta `npm run build` con Node.js 22 y publica `dist/`.
+El build crea `dist/`, con Three.js y OrbitControls incluidos. Publica esa carpeta en cualquier alojamiento estático con HTTP(S), también bajo un subdirectorio con URL terminada en `/`. Puedes comprobar el resultado con `npm run preview` (puerto 3036; detén antes el servidor de desarrollo o elige otro `PORT`). No necesita backend, claves ni servicios externos. Las fuentes de Google son opcionales y tienen alternativas del sistema. La publicación se realiza en [fabrica.jonatancheca.com](https://fabrica.jonatancheca.com/) mediante Cloudflare Pages, conectado a `jonahaley/FabricaDeDependencias`: cada push a `main` ejecuta `npm run build` con Node.js 22 y publica `dist/`.
 
 ## Jugar
 
