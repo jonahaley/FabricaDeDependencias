@@ -1,0 +1,13 @@
+import { mkdir, copyFile, cp } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const dist = path.join(root, 'dist');
+await mkdir(path.join(dist, 'vendor'), { recursive: true });
+await copyFile(path.join(root, 'index.html'), path.join(dist, 'index.html'));
+await cp(path.join(root, 'src'), path.join(dist, 'src'), { recursive: true });
+for (const file of ['three.module.js', 'three.core.js']) await copyFile(path.join(root, 'node_modules/three/build', file), path.join(dist, 'vendor', file));
+await mkdir(path.join(dist, 'vendor/addons/controls'), { recursive: true });
+await copyFile(path.join(root, 'node_modules/three/examples/jsm/controls/OrbitControls.js'), path.join(dist, 'vendor/addons/controls/OrbitControls.js'));
+await copyFile(path.join(root, 'node_modules/three/LICENSE'), path.join(dist, 'vendor/LICENSE-three.txt'));
+console.log('Build estático listo en dist/. Servir mediante HTTP(S).');

@@ -1,0 +1,23 @@
+{
+  "name": "fabrica-de-dependencias",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "type": "module",
+  "description": "Juego de gestión isométrico sobre seguridad de la cadena de suministro npm",
+  "scripts": {
+    "dev": "node scripts/server.mjs",
+    "start": "node scripts/server.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/server.mjs --dist",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "node-edge-tts": "^1.2.12"
+  }
+}
