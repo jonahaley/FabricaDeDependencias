@@ -2,6 +2,32 @@
 
 Juego de gestión y defensa en Three.js. Cada máquina representa un paquete npm; sus conexiones muestran dependencias compartidas. La construcción y la ejecución ocurren en plataformas separadas.
 
+## Capturas de pantalla
+
+### Fábrica en 3D
+
+Vista general con las máquinas en producción, el catálogo de paquetes, el encargo activo y el inspector de seguridad.
+
+![Fábrica isométrica con tres máquinas en producción, sus dependencias y los controles de seguridad](docs/screenshots/fabrica.png)
+
+### Mapa de dependencias
+
+El mapa permite seleccionar una dependencia compartida y consultar qué módulos dependen de ella.
+
+![Mapa con serializer seleccionado como dependencia compartida por vault-store y courier-kit](docs/screenshots/dependencias.png)
+
+### Tutorial interactivo
+
+La práctica guiada explica cada decisión y resalta el control que debes utilizar, sin modificar tu partida.
+
+![Tutorial en el paso de abrir el mapa, con el botón Dependencias resaltado y las instrucciones visibles](docs/screenshots/tutorial.png)
+
+### Cine de la fábrica
+
+Los cortos educativos combinan escenas 3D, narración en español, subtítulos y controles de reproducción.
+
+![Corto Supply chain attack mostrando cómo una dependencia comprometida afecta a varias máquinas, con subtítulos y controles](docs/screenshots/cine.png)
+
 ## Ejecutar
 
 Requiere Node.js 22 o superior y npm.
