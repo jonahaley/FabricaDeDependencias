@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { constructionCost, constructionPrice, productionCost, productionPrice, visiblePoints } from './catalog.js';
 
-export function createFactory(container, onSelect) {
+export function createFactory(container, onSelect, onExpand, onExpandProduction) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#131c1b');
   scene.fog = new THREE.Fog('#131c1b', 42, 85);
@@ -13,11 +14,11 @@ export function createFactory(container, onSelect) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
   container.appendChild(renderer.domElement);
-  renderer.domElement.setAttribute('aria-label', 'Fábrica isométrica 3D. Arrastra para girar, usa la rueda para acercar. Selecciona máquinas también desde el mapa accesible.');
+  renderer.domElement.setAttribute('aria-label', 'Fábrica isométrica 3D. Arrastra para girar, usa la rueda para acercar. Selecciona máquinas también desde el mapa accesible. Amplía los puntos de construcción y producción con los botones situados bajo la fábrica.');
   const camera = new THREE.OrthographicCamera(-16, 16, 12, -12, 0.1, 120);
-  camera.position.set(22, 25, 29);
+  camera.position.set(22, 25, 31);
   const controls = new OrbitControls(camera, renderer.domElement);
-  controls.target.set(0, 0, 0); controls.enableDamping = true;
+  controls.target.set(0, 0, 2); controls.enableDamping = true;
   controls.minZoom = 0.65; controls.maxZoom = 2.5;
   controls.minPolarAngle = 0.3; controls.maxPolarAngle = Math.PI / 2.5;
   controls.enablePan = false; controls.update();
@@ -64,7 +65,7 @@ export function createFactory(container, onSelect) {
     box(staticGroup, cx, 0.15, 5.55, 9.4, 0.07, 0.09, color, 0.5, true);
     box(staticGroup, cx - 4.65, 0.15, 0, 0.07, 0.06, 11.2, color, 0.5, true);
     for (let z = -4.9; z < 5; z += 0.5) { const stripe = box(staticGroup, cx + 4.48, 0.17, z, 0.25, 0.05, 0.2, '#c6af67'); stripe.rotation.y = -0.5; }
-    label(staticGroup, title, cx, 0.4, 6.3, color, 4.2);
+    label(staticGroup, title, cx, 0.4, 12.3, color, 4.2);
     for (const z of [-5, 5]) for (const x of [-4, 4]) cylinder(staticGroup, cx + x, -0.55, z, 0.25, 1, '#1a2521');
   }
   // The bridge is a deployment boundary, not a dependency edge.
@@ -128,11 +129,49 @@ export function createFactory(container, onSelect) {
     if (active) { const p = box(dynamic, 0, 0.4, 0, 0.16, 0.16, 0.16, color, 0.2, true); movers.push({ mesh: p, curve, offset: movers.length * 0.27 }); }
   }
   function disposeGroup(group) { group.traverse(o => { o.geometry?.dispose(); if (o.isSprite) { o.material.map?.dispose(); o.material.dispose(); } if (o.isLineSegments) o.material.dispose(); }); scene.remove(group); }
+  function infrastructurePoints(state, production = false) {
+    const points = production ? state.productionPoints : state.constructionPoints;
+    const price = production ? productionPrice : constructionPrice;
+    const getCost = production ? productionCost : constructionCost;
+    const cx = production ? 5.4 : -5.4;
+    const visible = visiblePoints(points), compact = visible.length > 3;
+    for (const [slot, i] of visible.entries()) {
+      const built = i < points, next = i === points;
+      const cost = getCost(i);
+      const station = new THREE.Group(); station.position.set(cx - 3 + slot % 3 * 3, 0, compact ? 7.6 + Math.floor(slot / 3) * 2.5 : 8.3);
+      if (compact) station.scale.setScalar(0.75);
+      dynamic.add(station);
+      const color = built ? production ? '#8bcad5' : '#b8e981' : '#718275';
+      box(station, 0, -0.25, 0, 2.6, 0.6, 2.8, '#25332e');
+      box(station, 0, 0.1, 0, 2.4, 0.1, 2.6, built ? '#42553a' : '#2c3b31');
+      if (slot < 3) box(station, 0, 0.13, -2, 0.8, 0.12, 1.4, '#4f5f53');
+      if (built && production) {
+        box(station, 0, 0.8, 0, 1.3, 1.3, 1.1, '#587d83');
+        for (let rack = 0; rack < 3; rack++) box(station, 0, 0.4 + rack * 0.35, 0.57, 0.9, 0.15, 0.04, color, 0.2, true);
+        cylinder(station, 0, 1.6, 0, 0.35, 0.2, color);
+      } else if (built) {
+        box(station, 0, 0.55, 0, 1.5, 0.8, 1.1, '#667d60');
+        box(station, 0, 1, 0, 1.8, 0.14, 1.3, '#b9c6a3');
+        box(station, 0, 1.4, -0.25, 0.9, 0.65, 0.18, '#263c30');
+        box(station, 0, 1.4, -0.14, 0.7, 0.42, 0.03, color, 0.2, true);
+        for (const x of [-0.95, 0.95]) box(station, x, 1.25, -0.8, 0.1, 2.2, 0.1, '#c0b38b');
+        box(station, 0, 2.35, -0.8, 2, 0.15, 0.15, color);
+      } else {
+        box(station, 0, 0.2, 0, 0.8, 0.06, 0.14, color);
+        box(station, 0, 0.2, 0, 0.14, 0.06, 0.8, color);
+      }
+      label(station, built ? `${production ? 'PROD.' : 'PUNTO'} ${i + 1}` : `+ ${price(i)} CR`, 0, built ? 2.8 : 0.8, 0, color, 2.5);
+      if (next && state.budget >= cost && !state.ended) station.traverse(o => { if (o.isMesh) { o.userData.expand = production ? 'production' : 'construction'; clickables.push(o); } });
+    }
+    if (visible[0]) label(dynamic, `+ ${visible[0]} PUNTOS ANTERIORES`, cx, 0.5, 13.8, production ? '#8bcad5' : '#b8e981', 4);
+  }
   function update(state, selected, mapMode) {
     playing = state.started && !state.paused && !state.ended;
-    const next = JSON.stringify([state.nodes.map(n => [n.id, n.phase, n.compromised, n.isolated, n.buildBlocked]), selected, mapMode, state.defenses]);
+    const pointCost = constructionCost(state.constructionPoints);
+    const next = JSON.stringify([state.nodes.map(n => [n.id, n.phase, n.compromised, n.isolated, n.buildBlocked]), selected, mapMode, state.defenses, state.constructionPoints, state.budget >= pointCost, state.productionPoints, state.budget >= productionCost(state.productionPoints), state.ended]);
     if (next === signature) return; signature = next; needsRender = true;
     disposeGroup(dynamic); dynamic = new THREE.Group(); scene.add(dynamic); clickables = []; movers = [];
+    infrastructurePoints(state); infrastructurePoints(state, true);
     const positions = new Map();
     for (const phase of ['build', 'run']) {
       const cx = phase === 'build' ? -5.4 : 5.4;
@@ -164,7 +203,7 @@ export function createFactory(container, onSelect) {
   renderer.domElement.addEventListener('pointerup', e => {
     if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
     const r = renderer.domElement.getBoundingClientRect(); pointer.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
-    raycaster.setFromCamera(pointer, camera); const hit = raycaster.intersectObjects(clickables, false)[0]; if (hit) onSelect(hit.object.userData.id);
+    raycaster.setFromCamera(pointer, camera); const hit = raycaster.intersectObjects(clickables, false)[0]; if (hit) { if (hit.object.userData.expand === 'production') onExpandProduction?.(); else if (hit.object.userData.expand === 'construction') onExpand?.(); else onSelect(hit.object.userData.id); }
   });
   const observer = new ResizeObserver(() => { const { width, height } = container.getBoundingClientRect(); if (!width || !height) return; renderer.setSize(width, height); const aspect = width / height, h = Math.max(9.7, 14 / aspect); camera.left = -h * aspect; camera.right = h * aspect; camera.top = h; camera.bottom = -h; camera.updateProjectionMatrix(); needsRender = true; }); observer.observe(container);
   let animation;
@@ -177,5 +216,5 @@ export function createFactory(container, onSelect) {
     needsRender = false; lastFrame = time;
   }
   animation = requestAnimationFrame(frame);
-  return { update, zoom(delta) { camera.zoom = THREE.MathUtils.clamp(camera.zoom + delta, 0.65, 2.5); camera.updateProjectionMatrix(); needsRender = true; }, reset() { camera.position.set(22, 25, 29); controls.target.set(0, 0, 0); camera.zoom = 1; camera.updateProjectionMatrix(); controls.update(); needsRender = true; }, dispose() { cancelAnimationFrame(animation); observer.disconnect(); controls.dispose(); disposeGroup(dynamic); disposeGroup(staticGroup); mats.forEach(m => m.dispose()); renderer.dispose(); } };
+  return { update, zoom(delta) { camera.zoom = THREE.MathUtils.clamp(camera.zoom + delta, 0.65, 2.5); camera.updateProjectionMatrix(); needsRender = true; }, reset() { camera.position.set(22, 25, 31); controls.target.set(0, 0, 2); camera.zoom = 1; camera.updateProjectionMatrix(); controls.update(); needsRender = true; }, dispose() { cancelAnimationFrame(animation); observer.disconnect(); controls.dispose(); disposeGroup(dynamic); disposeGroup(staticGroup); mats.forEach(m => m.dispose()); renderer.dispose(); } };
 }

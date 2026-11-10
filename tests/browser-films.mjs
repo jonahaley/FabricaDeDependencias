@@ -30,9 +30,13 @@ try {
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(origin);
-  await page.getByRole('button', { name: 'Omitir por ahora' }).click();
+  await page.locator('[data-action="project-type"][data-id="editor"]').click();
+  await page.getByRole('button', { name: 'Crear proyecto' }).click();
+  await page.locator('#catalog [data-action="select"][data-id="pixel-press"]').click();
   await page.locator('[data-action="install"]').click();
-  await page.getByRole('button', { name: 'Cómo jugar', exact: true }).click();
+  await page.locator('#order [data-action="deploy-all"]').click();
+  await page.locator('[data-action="develop"]').click();
+  await page.getByRole('button', { name: 'Guía de seguridad', exact: true }).click();
   assert.equal(await page.locator('.film-card').count(), 10);
   assert.equal(await page.locator('.film-lesson-link').count(), 10);
   const campaign = await page.evaluate(key => JSON.parse(localStorage.getItem(key)), SAVE_KEY);
@@ -120,7 +124,7 @@ try {
     HTMLCanvasElement.prototype.getContext = function (type, ...args) { return type.startsWith('webgl') ? null : original.call(this, type, ...args); };
   });
   await fallback.goto(origin);
-  await fallback.getByRole('button', { name: 'Cómo jugar', exact: true }).click();
+  await fallback.getByRole('button', { name: 'Guía de seguridad', exact: true }).click();
   await fallback.locator('.film-card').first().click();
   assert.ok(await fallback.locator('.film-no-webgl').isVisible());
   await fallback.locator('.film-start').click();
@@ -129,7 +133,7 @@ try {
   assert.equal(await fallback.evaluate(() => window.testAudio.at(-1).getAttribute('src')), null);
   // Missing audio remains an explicit, usable subtitle fallback instead of hanging the player.
   await fallback.route('**/src/audio/*.mp3', route => route.abort());
-  await fallback.getByRole('button', { name: 'Cómo jugar', exact: true }).click();
+  await fallback.getByRole('button', { name: 'Guía de seguridad', exact: true }).click();
   await fallback.locator('.film-card').first().click();
   await fallback.locator('.film-start').click();
   await fallback.waitForFunction(() => document.querySelector('.film-audio-status').textContent.includes('Audio no disponible'));

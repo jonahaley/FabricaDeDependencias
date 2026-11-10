@@ -5,7 +5,10 @@ export const PACKAGES = [
   { id: 'pixel-pres', name: 'pixel-pres', version: '3.2.1', category: 'image', title: 'Procesador de imágenes', description: 'Una alternativa económica. Revisa su identidad.', cost: 95, color: '#b8e981', deps: ['codec-core'], publisher: 'pixel-support-01', registry: 'Público', script: 'Lee variables del entorno y contacta con un servidor externo.', malicious: 'typo', official: false },
   { id: 'image-legacy', name: 'image-legacy', version: '0.8.0', category: 'image', title: 'Motor clásico · EOL', description: 'Barato, pero el mantenimiento ha terminado.', cost: 80, color: '#dfb87c', deps: ['codec-legacy'], publisher: 'archivo-imagen', registry: 'Público', eol: true, official: true },
   { id: '@factory/ledger', name: '@factory/ledger', version: '1.3.0', category: 'data', title: 'Registro privado', description: 'Paquete interno. Necesita un registro bien configurado.', cost: 130, color: '#8bcad5', deps: ['query-driver'], publisher: 'factory-internal', registry: 'Privado', private: true, official: true },
-  { id: 'omni-suite', name: 'omni-suite', version: '5.0.0', category: 'all', title: 'Suite todo en uno', description: 'Tres funciones. Diez dependencias transitivas.', cost: 380, color: '#f0b896', deps: ['codec-core', 'color-math', 'serializer', 'queue-core', 'query-driver', 'template-kit', 'http-helper', 'file-glob', 'date-tool', 'metrics-agent'], publisher: 'omni-team', registry: 'Público', official: true },
+  { id: 'omni-suite', name: 'omni-suite', version: '5.0.0', category: 'all', title: 'Suite de imágenes, mensajes y datos', description: 'Tres funciones básicas. Diez dependencias transitivas. No incluye autenticación, pagos ni búsqueda.', cost: 380, color: '#f0b896', deps: ['codec-core', 'color-math', 'serializer', 'queue-core', 'query-driver', 'template-kit', 'http-helper', 'file-glob', 'date-tool', 'metrics-agent'], publisher: 'omni-team', registry: 'Público', official: true },
+  { id: 'identity-gate', name: 'identity-gate', version: '2.1.0', category: 'auth', title: 'Cuentas y sesiones', description: 'Identifica usuarios y controla sus sesiones.', cost: 220, color: '#f2d78a', deps: ['token-core', 'serializer'], publisher: 'identity-team', registry: 'Público', official: true },
+  { id: 'checkout-flow', name: 'checkout-flow', version: '1.6.2', category: 'payment', title: 'Pasarela de pagos', description: 'Gestiona cobros y confirma operaciones.', cost: 280, color: '#ef9fb5', deps: ['payment-core', 'http-helper'], publisher: 'checkout-team', registry: 'Público', official: true },
+  { id: 'index-scout', name: 'index-scout', version: '3.0.1', category: 'search', title: 'Índice de búsqueda', description: 'Indexa documentos y encuentra resultados.', cost: 210, color: '#91b7f0', deps: ['index-core', 'query-driver'], publisher: 'scout-maintainers', registry: 'Público', official: true },
 ];
 export const PARTS = {
   'codec-core': { name: 'codec-core', version: '1.0.0', category: 'image', color: '#b8e981' },
@@ -13,6 +16,9 @@ export const PARTS = {
   serializer: { name: 'serializer', version: '1.2.0', category: 'message', color: '#d6b3ef' },
   'queue-core': { name: 'queue-core', version: '2.0.2', category: 'message', color: '#d6b3ef' },
   'query-driver': { name: 'query-driver', version: '3.1.1', category: 'data', color: '#8bcad5' },
+  'token-core': { name: 'token-core', version: '1.2.0', category: 'auth', color: '#f2d78a' },
+  'payment-core': { name: 'payment-core', version: '2.0.0', category: 'payment', color: '#ef9fb5' },
+  'index-core': { name: 'index-core', version: '1.4.0', category: 'search', color: '#91b7f0' },
   'codec-legacy': { name: 'codec-legacy', version: '0.3.0', category: 'image', color: '#dfb87c', known: true, eol: true },
   'template-kit': { name: 'template-kit', version: '1.1.0' }, 'http-helper': { name: 'http-helper', version: '2.0.0' },
   'file-glob': { name: 'file-glob', version: '3.0.0' }, 'date-tool': { name: 'date-tool', version: '1.4.0' }, 'metrics-agent': { name: 'metrics-agent', version: '0.9.0' },
@@ -25,12 +31,46 @@ export const DEFENSES = [
   { id: 'lockfile', name: 'Fijar lockfile', cost: 60, icon: 'file', description: 'Reproduce versiones directas y transitivas. Evita actualizaciones implícitas, pero también conserva fallos existentes.' },
   { id: 'network', name: 'Segmentar la red', cost: 150, icon: 'shield', description: 'Cierra accesos públicos directos. El gateway valida solicitudes y mitiga el vector remoto de esta simulación.' },
 ];
-export const ORDERS = [
-  { title: 'Un estudio en la nube', client: 'LUMEN / ESTUDIO CREATIVO', description: 'Procesa las imágenes del estudio y guarda los resultados sin exponer sus datos.', needs: ['image', 'data'], units: 18, reward: 450 },
-  { title: 'La entrega importa', client: 'POST / MENSAJERÍA', description: 'Añade notificaciones para avisar al equipo de que sus imágenes están listas.', needs: ['image', 'message', 'data'], units: 24, reward: 400 },
-  { title: 'Resistir y recuperar', client: 'NODO / INFRAESTRUCTURA', description: 'Mantén las tres funciones, responde a los incidentes y entrega con los datos protegidos.', needs: ['image', 'message', 'data'], units: 40, reward: 600 },
+export const PROJECT_TYPES = [
+  { id: 'photo', title: 'Estudio de fotografía', icon: 'image', description: 'Edita imágenes y guarda las galerías de tus clientes.', needs: ['image', 'data'], level: 1, reward: 900 },
+  { id: 'newsletter', title: 'Plataforma de newsletters', icon: 'message', description: 'Gestiona suscriptores y envía sus publicaciones.', needs: ['message', 'data'], level: 1, reward: 850 },
+  { id: 'editor', title: 'Editor de imágenes', icon: 'image', description: 'Transforma imágenes en el navegador con un producto pequeño.', needs: ['image'], level: 1, reward: 650 },
+  { id: 'community', title: 'Comunidad privada', icon: 'auth', description: 'Crea cuentas, conversaciones y un espacio para sus miembros.', needs: ['auth', 'message', 'data'], level: 2, reward: 1300 },
+  { id: 'shop', title: 'Tienda online', icon: 'payment', description: 'Publica un catálogo con fotografías y cobra cada pedido.', needs: ['image', 'payment', 'data'], level: 2, reward: 1400 },
+  { id: 'search', title: 'Buscador de documentos', icon: 'search', description: 'Indexa archivos privados con acceso por usuario.', needs: ['search', 'auth', 'data'], level: 2, reward: 1300 },
+  { id: 'saas', title: 'SaaS por suscripción', icon: 'auth', description: 'Ofrece cuentas, cobros recurrentes y avisos a tus clientes.', needs: ['auth', 'payment', 'message', 'data'], level: 3, reward: 1800 },
+  { id: 'marketplace', title: 'Marketplace creativo', icon: 'all', description: 'Conecta creadores y compradores en un catálogo con pagos.', needs: ['image', 'search', 'payment', 'auth', 'data'], level: 3, reward: 2200 },
 ];
-export const LABELS = { image: 'Imágenes', message: 'Mensajes', data: 'Datos', all: 'Todo en uno' };
+export const PROJECT_SIZES = [
+  { id: 'prototype', title: 'Prototipo', units: 24, multiplier: 1 },
+  { id: 'product', title: 'Producto', units: 54, multiplier: 1.6 },
+  { id: 'platform', title: 'Plataforma', units: 84, multiplier: 2.3 },
+];
+export function getProjectSize(id, units) {
+  if (id !== 'custom') return PROJECT_SIZES.find(size => size.id === id) || null;
+  if (!Number.isSafeInteger(units) || units < 24) return null;
+  const multiplier = units <= 54 ? 1 + (units - 24) * 0.6 / 30 : 1.6 + (units - 54) * 0.7 / 30;
+  return { id: 'custom', title: 'A medida', units, multiplier };
+}
+const EXPANSION = { firstCost: 350, costMultiplier: 10 };
+export const CONSTRUCTION = { ...EXPANSION, unitsPerPoint: 30 };
+export const PRODUCTION = { ...EXPANSION, unitsPerPoint: 1 };
+function expansionCost(points, rules) { return rules.firstCost * rules.costMultiplier ** (points - 1); }
+function expansionPrice(points, rules) {
+  const cost = expansionCost(points, rules);
+  const [coefficient, exponent] = rules.firstCost.toExponential().split('e');
+  return cost < 1e9 ? cost.toLocaleString('es-ES', { useGrouping: 'always' }) : `${coefficient.replace('.', ',')}e${Number(exponent) + points - 1}`;
+}
+export function constructionCost(points) { return expansionCost(points, CONSTRUCTION); }
+export function constructionPrice(points) { return expansionPrice(points, CONSTRUCTION); }
+export function productionCost(points) { return expansionCost(points, PRODUCTION); }
+export function productionPrice(points) { return expansionPrice(points, PRODUCTION); }
+// Only the visible window is bounded; every installed point retains its capacity.
+export function visiblePoints(points) {
+  const start = Math.max(0, points - 5);
+  return Array.from({ length: Math.min(points + 1, 6) }, (_, index) => start + index);
+}
+export const LABELS = { image: 'Imágenes', message: 'Mensajes', data: 'Datos', auth: 'Autenticación', payment: 'Pagos', search: 'Búsqueda', all: 'Suite básica' };
 export const LESSONS = [
   ['Cadena de suministro', 'Una versión comprometida puede entrar a través de una dependencia legítima. Revisa también las transitivas y el origen de las actualizaciones.'],
   ['Scripts de instalación', 'Los scripts de ciclo de vida pueden ejecutar código antes de arrancar la aplicación. Bloquearlos puede impedir builds legítimos: revisa y autoriza lo necesario.'],

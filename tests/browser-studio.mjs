@@ -1,0 +1,264 @@
+// Node 22+, optional absolute path to playwright/index.mjs as the first argument.
+// Isolated browser profile; production ticks are advanced deterministically.
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { mkdir } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
+import { setTimeout as delay } from 'node:timers/promises';
+import net from 'node:net';
+import { Game, SAVE_KEY } from '../src/game.js';
+const { chromium } = await import(process.argv[2] ? pathToFileURL(process.argv[2]).href : 'playwright');
+const reservation = net.createServer();
+await new Promise(resolve => reservation.listen(0, '127.0.0.1', resolve));
+const port = reservation.address().port;
+await new Promise(resolve => reservation.close(resolve));
+const server = spawn(process.execPath, ['scripts/server.mjs', '--dist'], { env: { ...process.env, PORT: String(port) }, windowsHide: true, stdio: 'pipe' });
+const origin = `http://127.0.0.1:${port}`;
+let browser;
+const errors = [];
+try {
+  for (let i = 0; i < 50; i++) { if (await fetch(origin).then(r => r.ok).catch(() => false)) break; await delay(100); }
+  browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } : {}) });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+  await context.addInitScript(() => {
+    const nativeInterval = window.setInterval;
+    window.setInterval = (fn, ms, ...args) => {
+      if (ms === 1000) { window.advanceStudio = count => { for (let i = 0; i < count; i++) fn(); }; return 99999; }
+      return nativeInterval(fn, ms, ...args);
+    };
+  });
+  const page = await context.newPage();
+  page.on('pageerror', error => errors.push(error.message));
+  const click = async (action, id, scope = '') => page.locator(`${scope} [data-action="${action}"]${id ? `[data-id="${id}"]` : ''}`.trim()).first().click();
+  const state = () => page.evaluate(key => JSON.parse(localStorage.getItem(key)), SAVE_KEY);
+  const tick = n => page.evaluate(n => window.advanceStudio(n), n);
+  const noOverflow = async () => assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true, 'Sin desbordamiento horizontal');
+  await page.goto(origin); await page.locator('.project-type').first().waitFor();
+  assert.equal(await page.locator('.project-type').count(), 8);
+  assert.equal(await page.locator('.project-type:not(:disabled)').count(), 3);
+  assert.equal(await page.locator('.tutorial-entry [data-action="tutorial-start"]').isVisible(), true);
+  assert.equal(await page.locator('#remaining').count(), 0);
+  assert.equal(await page.locator('#home-construction .built').count(), 1);
+  assert.equal(await page.locator('#home-production .built').count(), 1);
+  assert.match(await page.locator('#home-production').innerText(), /1 unidad\/s/);
+  assert.equal(await page.locator('#project-size option[value="product"]').isDisabled(), true);
+  await mkdir('.playwright-mcp', { recursive: true });
+  await page.screenshot({ path: '.playwright-mcp/studio-home-desktop.png', fullPage: true });
+  await noOverflow();
+  await page.locator('#project-name').fill('Lumen · Estudio creativo');
+  await page.getByRole('button', { name: 'Crear proyecto' }).click();
+  assert.equal(await page.locator('.project-identity h1').innerText(), 'Lumen · Estudio creativo');
+  const preparation = await state(); await tick(1000); assert.deepEqual(await state(), preparation);
+  await click('tab', 'defenses');
+  for (const id of ['scripts', 'network', 'lockfile']) await click('defend', id);
+  await click('requirement', 'image');
+  await click('select', 'pixel-press', '#catalog'); await click('inspect', 'pixel-press'); await click('install', 'pixel-press');
+  assert.equal((await state()).started, false); await click('authorize', 'pixel-press');
+  await click('requirement', 'data'); await click('select', 'vault-store', '#catalog'); await click('inspect', 'vault-store'); await click('install', 'vault-store');
+  await click('deploy-all', null, '#order');
+  assert.equal(await page.locator('.project-requirements .complete').count(), 2);
+  await click('develop'); await tick(5); assert.equal((await state()).progress, 5);
+  await click('pause'); const paused = await state(); await tick(500); assert.deepEqual(await state(), paused);
+  await click('map'); assert.equal(await page.locator('.graph-root').count(), 2); await click('select', 'codec-core', '#graph');
+  assert.match(await page.locator('#inspector').innerText(), /pixel-press/);
+  await click('factory'); await click('catalog');
+  await page.screenshot({ path: '.playwright-mcp/studio-project-desktop.png', fullPage: true });
+  await click('develop'); await tick(19); assert.equal((await state()).progress, 24);
+  const complete = await state(); await tick(1000); assert.deepEqual(await state(), complete);
+  await click('deliver'); assert.equal((await state()).delivered, 1); assert.equal(await page.locator('.project-type:not(:disabled)').count(), 6);
+  assert.equal(await page.locator('.release-report').count(), 1);
+  for (const width of [768, 390, 320]) {
+    await page.setViewportSize({ width, height: 900 }); await noOverflow();
+    await page.screenshot({ path: `.playwright-mcp/studio-home-${width}.png`, fullPage: true });
+  }
+  assert.equal(await page.locator('#project-size option[value="product"]').isDisabled(), true);
+  const beforeExpansion = (await state()).budget;
+  await click('add-construction', null, '#home-construction');
+  assert.equal((await state()).constructionPoints, 2); assert.equal((await state()).budget, beforeExpansion - 350);
+  assert.equal(await page.locator('#project-size option[value="product"]').isDisabled(), false);
+  assert.equal(await page.locator('#project-size option[value="platform"]').isDisabled(), true);
+  await noOverflow();
+  await click('project-type', 'shop'); await page.locator('#project-size').selectOption('product');
+  await page.locator('#project-name').fill('Tienda de prueba'); await page.getByRole('button', { name: 'Crear proyecto' }).click();
+  assert.equal((await state()).nodes.length, 0); assert.equal((await state()).defenses.length, 3);
+  assert.equal((await state()).project.units, 54);
+  assert.equal(await page.locator('#workshop-construction .built').count(), 2);
+  for (const id of ['pixel-press', 'vault-store', 'checkout-flow']) {
+    await click('catalog'); await click('select', id, '#catalog'); await click('install', id);
+    if (id === 'pixel-press') await click('authorize', id);
+  }
+  await click('deploy-all', null, '#order'); await click('develop'); await tick(10);
+  await page.reload(); await page.locator('#order h1').waitFor();
+  assert.equal((await state()).progress, 10); await tick(100); assert.equal((await state()).progress, 10);
+  assert.equal((await state()).constructionPoints, 2);
+  await noOverflow(); await page.screenshot({ path: '.playwright-mcp/studio-project-320.png', fullPage: true });
+  await click('develop'); await tick(44); assert.equal((await state()).progress, 54); await click('deliver');
+  assert.equal((await state()).delivered, 2);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await click('project-type', 'photo'); await page.locator('#project-name').fill('<b>Mi galería</b>'); await page.getByRole('button', { name: 'Crear proyecto' }).click();
+  assert.equal(await page.locator('.project-identity h1').innerText(), '<b>Mi galería</b>');
+  assert.equal(await page.locator('.project-identity h1 b').count(), 0);
+  await click('select', 'pixel-pres', '#catalog'); await click('install', 'pixel-pres');
+  await click('deploy-all', null, '#order'); assert.equal((await state()).incidents.length, 1);
+  const incident = await state(); await tick(100); assert.deepEqual(await state(), incident);
+  await click('isolate', 'pixel-pres'); await click('rotate', null, '#inspector'); await click('remove', 'pixel-pres');
+  assert.equal((await state()).secretsLeaked, false); assert.ok((await state()).incidents.every(i => i.resolved));
+  await click('guide', null, '.topbar'); assert.equal(await page.locator('.film-card').count(), 10);
+  await click('film', 'supply-chain'); assert.equal(await page.locator('.film-player').count(), 1); await click('close-modal');
+  await click('abandon-dialog', null, '.project-identity'); await click('abandon'); assert.equal((await state()).project, null);
+  const beforeThird = (await state()).budget;
+  await click('add-construction', null, '#home-construction');
+  assert.equal((await state()).constructionPoints, 3); assert.equal((await state()).budget, beforeThird - 3500);
+  assert.match(await page.locator('#home-construction [data-action="add-construction"]').innerText(), /35\.000 cr/);
+  assert.equal(await page.locator('#home-construction [data-action="add-construction"]').isDisabled(), true);
+  await page.reload(); await page.locator('#home-construction .built').first().waitFor();
+  assert.equal(await page.locator('#home-construction .built').count(), 3);
+  const wealthy = await state(); wealthy.budget = 400000;
+  await page.evaluate(({ key, saved }) => localStorage.setItem(key, JSON.stringify(saved)), { key: SAVE_KEY, saved: wealthy });
+  await page.reload(); await page.locator('#home-construction .built').first().waitFor();
+  await click('add-construction', null, '#home-construction');
+  assert.equal((await state()).constructionPoints, 4); assert.equal((await state()).budget, 365000);
+  assert.equal(await page.locator('#home-construction .built').count(), 4);
+  await click('add-construction', null, '#home-construction');
+  assert.equal((await state()).constructionPoints, 5); assert.equal((await state()).budget, 15000);
+  await page.reload(); await page.locator('#home-construction .built').first().waitFor();
+  assert.equal(await page.locator('#home-construction .built').count(), 5);
+  await click('project-type', 'editor'); await page.getByRole('button', { name: 'Crear proyecto' }).click();
+  for (const width of [1440, 390, 320]) {
+    await page.setViewportSize({ width, height: 1000 }); await noOverflow();
+    await page.screenshot({ path: `.playwright-mcp/construction-unlimited-${width}.png`, fullPage: true });
+  }
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const poor = new Game(); poor.state.budget = 349; poor.state.delivered = 4;
+  await page.evaluate(({ key, saved }) => localStorage.setItem(key, JSON.stringify(saved)), { key: SAVE_KEY, saved: poor.state });
+  await page.reload(); await page.locator('#home-construction .built').first().waitFor();
+  assert.equal(await page.locator('#home-construction [data-action="add-construction"]').isDisabled(), true);
+  assert.match(await page.locator('#home-construction').innerText(), /Te faltan 1 cr/);
+  assert.equal(await page.locator('#home-production [data-action="add-production"]').isDisabled(), true);
+  assert.match(await page.locator('#home-production').innerText(), /Te faltan 1 cr/);
+  assert.equal(await page.locator('#project-size option[value="product"]').isDisabled(), true);
+  const legacy = new Game(); legacy.state.budget = 6000; legacy.state.delivered = 4; legacy.addConstructionPoint(); legacy.addConstructionPoint();
+  legacy.propose('editor', 'Plataforma guardada', 'platform'); legacy.defend('network'); legacy.defend('lockfile');
+  legacy.install('pixel-press'); legacy.deployAll(); delete legacy.state.constructionPoints;
+  await page.evaluate(({ key, saved }) => localStorage.setItem(key, JSON.stringify(saved)), { key: SAVE_KEY, saved: legacy.state });
+  await page.reload(); await page.locator('#workshop-construction .built').first().waitFor();
+  assert.equal(await page.locator('#workshop-construction .built').count(), 3);
+  await click('develop'); await tick(84); await click('deliver');
+  assert.equal((await state()).history[0].size, 'platform');
+
+  const production = new Game(); production.state.budget = 60000;
+  await page.evaluate(({ key, saved }) => localStorage.setItem(key, JSON.stringify(saved)), { key: SAVE_KEY, saved: production.state });
+  await page.reload(); await page.locator('#home-production .built').first().waitFor();
+  await click('add-production', null, '#home-production');
+  assert.equal((await state()).productionPoints, 2); assert.equal((await state()).budget, 59650);
+  assert.equal((await state()).constructionPoints, 1);
+  await click('project-type', 'editor'); await page.getByRole('button', { name: 'Crear proyecto' }).click();
+  await click('select', 'pixel-press', '#catalog'); await click('install', 'pixel-press'); await click('deploy-all', null, '#order');
+  await click('develop'); await tick(2); assert.equal((await state()).progress, 4);
+  await click('add-production', null, '#workshop-production');
+  assert.equal((await state()).productionPoints, 3); assert.equal((await state()).project.spent, 3740);
+  await tick(1); assert.equal((await state()).progress, 7);
+  await click('speed'); await tick(1); assert.equal((await state()).progress, 13);
+  assert.match(await page.locator('#workshop-production').innerText(), /6 unidades\/s durante/);
+  await click('pause'); await tick(3); assert.equal((await state()).progress, 13);
+  await page.reload(); await page.locator('#workshop-production .built').first().waitFor();
+  assert.equal(await page.locator('#workshop-production .built').count(), 3); await tick(1); assert.equal((await state()).progress, 13);
+  await click('add-production', null, '#workshop-production');
+  assert.equal((await state()).productionPoints, 4);
+  await click('develop'); await tick(1); assert.equal((await state()).progress, 17);
+  assert.match(await page.locator('#order').innerText(), /4 unidades\/s/);
+  await click('pause');
+  for (const width of [1440, 768, 390, 320]) {
+    await page.setViewportSize({ width, height: 1000 }); await noOverflow();
+    await page.locator('#workshop-production').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `.playwright-mcp/production-${width}.png`, fullPage: true });
+  }
+  await click('develop'); await tick(2); assert.equal((await state()).progress, 24);
+  assert.equal((await state()).maintenance, 6); await click('deliver');
+  assert.equal((await state()).productionPoints, 4);
+
+  const scalable = new Game(); scalable.state.constructionPoints = 4;
+  scalable.state.productionPoints = 2; scalable.state.budget = 500000;
+  await page.evaluate(({ key, saved }) => localStorage.setItem(key, JSON.stringify(saved)), { key: SAVE_KEY, saved: scalable.state });
+  await page.setViewportSize({ width: 1440, height: 1000 }); await page.reload();
+  await page.locator('#project-size').waitFor();
+  assert.equal(await page.locator('.project-type:not(:disabled)').count(), 3);
+  assert.equal(await page.locator('#project-size option[value="product"]').isDisabled(), false);
+  assert.equal(await page.locator('#project-size option[value="platform"]').isDisabled(), false);
+  assert.doesNotMatch(await page.locator('#project-size').innerText(), /Nivel/);
+  await page.locator('#project-size').selectOption('platform');
+  assert.equal(await page.locator('#project-form button[type="submit"]').isDisabled(), false);
+  await page.locator('#project-size').selectOption('custom');
+  assert.equal(await page.locator('#project-units').inputValue(), '120');
+  assert.match(await page.locator('#brief-reward').innerText(), /2826 cr/);
+  await page.locator('#project-units').fill('84'); assert.match(await page.locator('#brief-reward').innerText(), /2070 cr/);
+  await page.locator('#project-units').fill('121'); assert.equal(await page.locator('#project-form button[type="submit"]').isDisabled(), true);
+  await page.locator('#project-units').fill(''); await tick(2); assert.equal(await page.locator('#project-units').inputValue(), '');
+  assert.equal(await page.locator('#project-form button[type="submit"]').isDisabled(), true);
+  await page.locator('#project-units').fill('24.5'); assert.equal(await page.locator('#project-form button[type="submit"]').isDisabled(), true);
+  await click('max-project-size'); assert.equal(await page.locator('#project-units').inputValue(), '120');
+  for (const width of [1440, 390, 320]) {
+    await page.setViewportSize({ width, height: 1000 }); await noOverflow();
+    await page.locator('#project-form').screenshot({ path: `.playwright-mcp/project-scale-planner-${width}.png` });
+  }
+  await page.locator('#project-name').fill('Proyecto sin techo'); await page.getByRole('button', { name: 'Crear proyecto' }).click();
+  assert.equal((await state()).project.units, 120); assert.equal((await state()).project.reward, 2826);
+  await click('tab', 'defenses'); await click('defend', 'network'); await click('defend', 'lockfile');
+  for (const id of ['pixel-press', 'vault-store']) {
+    await click('catalog'); await click('select', id, '#catalog'); await click('install', id);
+  }
+  await click('deploy-all', null, '#order'); await click('develop'); await tick(6);
+  assert.equal((await state()).progress, 12);
+  await click('add-construction', null, '#workshop-construction');
+  assert.equal((await state()).project.units, 120); assert.equal((await state()).constructionPoints, 5);
+  const beforeScopeExpansion = await state(); await click('expand-project');
+  assert.equal((await state()).project.units, 150); assert.equal((await state()).project.reward, 3456);
+  assert.equal((await state()).progress, 12); assert.equal((await state()).budget, beforeScopeExpansion.budget);
+  assert.equal((await state()).project.spent, beforeScopeExpansion.project.spent);
+  assert.match(await page.locator('#order').innerText(), /3456 cr/); await noOverflow();
+  await page.reload(); await page.locator('#order h1').waitFor(); await tick(1);
+  assert.equal((await state()).progress, 12); assert.equal((await state()).project.units, 150);
+  await click('develop'); await tick(69); assert.equal((await state()).progress, 150);
+  assert.equal((await state()).maintenance, 120); const beforeIncome = (await state()).budget;
+  await click('deliver'); const largeRelease = (await state()).history[0];
+  assert.equal(largeRelease.size, 'custom'); assert.equal(largeRelease.units, 150); assert.equal(largeRelease.reward, 3456);
+  assert.equal((await state()).budget, beforeIncome + largeRelease.income);
+  assert.match(await page.locator('#portfolio-list').innerText(), /A medida · 150 unidades/);
+
+  const many = new Game(); many.state.constructionPoints = 1000; many.state.productionPoints = 1000; many.propose('editor');
+  await page.evaluate(({ key, saved }) => localStorage.setItem(key, JSON.stringify(saved)), { key: SAVE_KEY, saved: many.state });
+  await page.setViewportSize({ width: 320, height: 1000 });
+  await page.reload(); await page.locator('#workshop-construction .built').first().waitFor();
+  assert.equal(await page.locator('#workshop-construction .construction-slot').count(), 6);
+  assert.match(await page.locator('#workshop-construction h2').innerText(), /1000 instalados/);
+  assert.match(await page.locator('#workshop-construction').innerText(), /995 puntos anteriores/);
+  assert.match(await page.locator('#workshop-construction [data-action="add-construction"]').innerText(), /3,5e1001/);
+  assert.doesNotMatch(await page.locator('#workshop-construction').innerText(), /Infinity|NaN|∞/);
+  assert.equal(await page.locator('#workshop-production .construction-slot').count(), 6);
+  assert.match(await page.locator('#workshop-production').innerText(), /1000 unidades\/s/);
+  assert.match(await page.locator('#workshop-production').innerText(), /995 puestos anteriores/);
+  assert.doesNotMatch(await page.locator('#workshop-production').innerText(), /Infinity|NaN|∞/);
+  await noOverflow(); await tick(1); assert.equal((await state()).constructionPoints, 1000);
+  await page.screenshot({ path: '.playwright-mcp/construction-many-320.png', fullPage: true });
+
+  const fallbackContext = await browser.newContext({ viewport: { width: 390, height: 900 } });
+  await fallbackContext.addInitScript(() => {
+    const nativeContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type, ...args) { return type.includes('webgl') ? null : nativeContext.call(this, type, ...args); };
+  });
+  const fallback = await fallbackContext.newPage();
+  fallback.on('pageerror', error => errors.push(error.message));
+  await fallback.goto(origin); await fallback.getByRole('button', { name: 'Crear proyecto' }).click();
+  assert.equal(await fallback.locator('.webgl-error').isVisible(), true);
+  await fallback.locator('#workshop-construction [data-action="add-construction"]').click();
+  assert.equal(await fallback.locator('#workshop-construction .built').count(), 2);
+  const fallbackState = await fallback.evaluate(key => JSON.parse(localStorage.getItem(key)), SAVE_KEY);
+  assert.equal(fallbackState.budget, 2050); assert.equal(fallbackState.project.spent, 350);
+  await fallback.locator('#workshop-production [data-action="add-production"]').click();
+  assert.equal(await fallback.locator('#workshop-production .built').count(), 2);
+  const fallbackProduction = await fallback.evaluate(key => JSON.parse(localStorage.getItem(key)), SAVE_KEY);
+  assert.equal(fallbackProduction.budget, 1700); assert.equal(fallbackProduction.project.spent, 700);
+  assert.equal(await fallback.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+  await fallbackContext.close();
+  assert.deepEqual(errors, []); console.log('Browser studio OK: proyectos a medida y ampliación, ingresos, construcción, producción, guardado, sin WebGL y tamaños 1440/768/390/320.');
+} finally { await browser?.close(); server.kill(); }
